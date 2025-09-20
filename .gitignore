@@ -23,3 +23,5 @@ __pycache__/
 # Ignore distribution files
 dist/
 
+readme.md
+
