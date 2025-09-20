@@ -1,0 +1,18 @@
+{
+  "name": "jdbc-sink-ecommerce", 
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "ecommerce.customers,ecommerce.products,ecommerce.orders,ecommerce.order_items,ecommerce.payments,ecommerce.shipments",
+    "connection.url": "jdbc:postgresql://localhost:5432/transactions",
+    "connection.user": "pgwriter", 
+    "connection.password": "PG_PASS",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "insert.mode": "upsert",
+    "pk.mode": "record_key",
+    "pk.fields": "id",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState"
+  }
+}

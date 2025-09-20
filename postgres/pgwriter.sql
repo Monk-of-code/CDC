@@ -1,0 +1,26 @@
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'pgwriter') THEN
+        CREATE USER pgwriter WITH PASSWORD 'PG_PASS';
+    END IF;
+END
+$$;
+
+-- Grant privileges for both schemas
+GRANT CONNECT ON DATABASE transactions TO pgwriter;
+
+-- HR schema privileges
+GRANT USAGE, CREATE ON SCHEMA hr TO pgwriter;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA hr TO pgwriter;
+ALTER DEFAULT PRIVILEGES IN SCHEMA hr GRANT ALL PRIVILEGES ON TABLES TO pgwriter;
+
+-- Ecommerce schema privileges
+GRANT USAGE, CREATE ON SCHEMA ecommerce TO pgwriter;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA ecommerce TO pgwriter;
+ALTER DEFAULT PRIVILEGES IN SCHEMA ecommerce GRANT ALL PRIVILEGES ON TABLES TO pgwriter;
+
+-- Sequence privileges for both schemas
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA hr TO pgwriter;
+GRANT USAGE ON ALL SEQUENCES IN SCHEMA ecommerce TO pgwriter;
+ALTER DEFAULT PRIVILEGES IN SCHEMA hr GRANT USAGE ON SEQUENCES TO pgwriter;
+ALTER DEFAULT PRIVILEGES IN SCHEMA ecommerce GRANT USAGE ON SEQUENCES TO pgwriter;

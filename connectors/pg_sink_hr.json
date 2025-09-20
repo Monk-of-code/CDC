@@ -1,0 +1,18 @@
+{
+  "name": "jdbc-sink-hr",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "hr.employees,hr.departments,hr.salaries,hr.attendance,hr.projects,hr.employee_projects",
+    "connection.url": "jdbc:postgresql://localhost:5432/transactions",
+    "connection.user": "pgwriter",
+    "connection.password": "PG_PASS",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "insert.mode": "upsert",
+    "pk.mode": "record_key",
+    "pk.fields": "id",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState"
+  }
+}

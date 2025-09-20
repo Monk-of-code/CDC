@@ -1,0 +1,4 @@
+faker
+pyodbc
+pandas
+SQLAlchemy      

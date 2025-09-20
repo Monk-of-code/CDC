@@ -1,0 +1,25 @@
+.env
+venv
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+*.egg
+
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints          
+
+# Ignore Python bytecode files
+*.py[cod]
+# Ignore virtual environment directories
+venv/
+# Ignore Python cache directories
+__pycache__/
+# Ignore distribution files
+dist/
+
