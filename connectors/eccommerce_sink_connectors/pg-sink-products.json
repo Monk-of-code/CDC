@@ -1,0 +1,30 @@
+{
+  "name": "pg-sink-products",
+  "config": {
+    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "connection.url": "jdbc:postgresql://172.17.0.1:5433/transactions",
+    "connection.username": "pgwriter",
+    "connection.password": "PG_PASS",
+    "topics": "transactions.ecommerce.products",
+    "table.name.format": "ecommerce.products",
+    "insert.mode": "upsert",
+    "primary.key.mode": "record_key",
+    "primary.key.fields": "product_id",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "delete.enabled": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    
+    "transforms": "dropFields,renameTags,castTypes",
+    "transforms.dropFields.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.dropFields.blacklist": "uuid,cost,min_stock_level,max_stock_level,is_available,manufacturer,sku,created_at,updated_at,rating,__deleted",
+    "transforms.renameTags.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.renameTags.renames": "product_metadata:tags",
+    "transforms.castTypes.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.castTypes.spec": "price:float64,weight:float64"
+  }
+}

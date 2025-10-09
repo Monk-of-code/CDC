@@ -1,0 +1,30 @@
+{
+  "name": "pg-sink-payments",
+  "config": {
+    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "connection.url": "jdbc:postgresql://172.17.0.1:5433/transactions",
+    "connection.username": "pgwriter",
+    "connection.password": "PG_PASS",
+    "topics": "transactions.ecommerce.payments",
+    "table.name.format": "ecommerce.payments",
+    "insert.mode": "upsert",
+    "primary.key.mode": "record_key",
+    "primary.key.fields": "payment_id",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "delete.enabled": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    
+    "transforms": "dropFields,castTypes,renameFields",
+    "transforms.dropFields.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.dropFields.blacklist": "uuid,payment_date,transaction_id,card_last_four,card_brand,payment_gateway,currency,__deleted",
+    "transforms.castTypes.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.castTypes.spec": "amount:float64",
+    "transforms.renameFields.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.renameFields.renames": "payment_method:method,payment_status:status"
+  }
+}

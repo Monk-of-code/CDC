@@ -1,0 +1,28 @@
+{
+  "name": "pg-sink-customers",
+  "config": {
+    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "connection.url": "jdbc:postgresql://172.17.0.1:5433/transactions",
+    "connection.username": "pgwriter",
+    "connection.password": "PG_PASS",
+    "topics": "transactions.ecommerce.customers",
+    "table.name.format": "ecommerce.customers",
+    "insert.mode": "upsert",
+    "primary.key.mode": "record_key",
+    "primary.key.fields": "customer_id",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "delete.enabled": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    
+    "transforms": "dropFields,castBalance",
+    "transforms.dropFields.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.dropFields.blacklist": "uuid,created_at,updated_at,__deleted",
+    "transforms.castBalance.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.castBalance.spec": "account_balance:float64"
+  }
+}

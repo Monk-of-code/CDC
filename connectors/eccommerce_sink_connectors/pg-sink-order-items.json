@@ -1,0 +1,28 @@
+{
+  "name": "pg-sink-order-items",
+  "config": {
+    "connector.class": "io.debezium.connector.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "connection.url": "jdbc:postgresql://172.17.0.1:5433/transactions",
+    "connection.username": "pgwriter",
+    "connection.password": "PG_PASS",
+    "topics": "transactions.ecommerce.order_items",
+    "table.name.format": "ecommerce.order_items",
+    "insert.mode": "upsert",
+    "primary.key.mode": "record_key",
+    "primary.key.fields": "order_item_id",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "delete.enabled": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "true",
+    
+    "transforms": "dropFields,castTypes",
+    "transforms.dropFields.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.dropFields.blacklist": "total_price,discount_percentage,__deleted",
+    "transforms.castTypes.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.castTypes.spec": "unit_price:float64"
+  }
+}
