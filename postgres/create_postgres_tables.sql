@@ -71,6 +71,18 @@ CREATE TABLE IF NOT EXISTS ecommerce.shipments (
     status VARCHAR(20)
 );
 
+CREATE TABLE IF NOT EXISTS ecommerce.reviews (
+    review_id SERIAL PRIMARY KEY,
+    void CHAR(36) NOT NULL,
+    product_id INTEGER REFERENCES ecommerce.products(product_id),
+    customer_id INTEGER REFERENCES ecommerce.customers(customer_id),
+    rating INTEGER NOT NULL,
+    title VARCHAR(255),
+    comment TEXT,
+    review_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
 -- Create HR Tables
 CREATE TABLE IF NOT EXISTS hr.departments (
     department_id SERIAL PRIMARY KEY,
@@ -127,6 +139,7 @@ CREATE INDEX IF NOT EXISTS idx_order_items_order ON ecommerce.order_items(order_
 CREATE INDEX IF NOT EXISTS idx_order_items_product ON ecommerce.order_items(product_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order ON ecommerce.payments(order_id);
 CREATE INDEX IF NOT EXISTS idx_shipments_order ON ecommerce.shipments(order_id);
+CREATE INDEX IF NOT EXISTS idx_reviews_customer ON ecommerce.reviews(customer_id);
 
 CREATE INDEX IF NOT EXISTS idx_employees_department ON hr.employees(department_id);
 CREATE INDEX IF NOT EXISTS idx_employees_manager ON hr.employees(manager_id);

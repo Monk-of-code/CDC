@@ -1,0 +1,16 @@
+FROM debezium/connect:2.7.3.Final
+
+USER root
+
+# Download JMX exporter
+RUN mkdir -p /kafka/etc && \
+    curl -so /kafka/etc/jmx_prometheus_javaagent.jar \
+    "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.20.0/jmx_prometheus_javaagent-0.20.0.jar"
+
+# Copy JMX configuration
+COPY config/jmx-exporter/jmx-exporter.yml /kafka/etc/jmx-exporter.yml
+
+# Set up the Java agent
+ENV KAFKA_OPTS="-javaagent:/kafka/etc/jmx_prometheus_javaagent.jar=9404:/kafka/etc/jmx-exporter.yml"
+
+USER kafka

@@ -10,33 +10,40 @@
     "database.server.name": "transactions",
     "database.include.list": "ecommerce",
     "table.include.list": "ecommerce.*",
+
+    "decimal.handling.mode": "string",
+    "bigint.unsigned.handling.mode": "long",
+
+    "database.character.set": "utf8",
+    "database.connectionTimeZone": "UTC",
     "snapshot.mode": "initial",
+    "snapshot.delay.ms": "1000",
+    "incremental.snapshot.enabled": "true",
     "include.schema.changes": "false",
+
     "database.allowPublicKeyRetrieval": "true",
     "database.ssl.mode": "disabled",
-    
     "topic.prefix": "transactions",
-    "heartbeat.interval.ms": "5000",
-    
+
     "key.converter": "org.apache.kafka.connect.json.JsonConverter",
     "value.converter": "org.apache.kafka.connect.json.JsonConverter",
-    "key.converter.schemas.enable": "false",
-    "value.converter.schemas.enable": "false",
-    
-    "tasks.max": "1",
-    "poll.interval.ms": "500",
-    "max.batch.size": "2048",
-    "max.queue.size": "8192",
-    "tombstones.on.delete": "false",
-    
-    "transforms": "unwrap",
-    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
-    "transforms.unwrap.delete.handling.mode": "drop",
-    "transforms.unwrap.drop.tombstones": "false",
+    "key.converter.schemas.enable": "true",
+    "value.converter.schemas.enable": "true",
 
-
-    "schema.history.internal": "io.debezium.storage.kafka.history.KafkaSchemaHistory",
     "schema.history.internal.kafka.bootstrap.servers": "sql-kafka-1:9092",
-    "schema.history.internal.kafka.topic": "dbhistory.ecommerce"
+    "schema.history.internal.kafka.topic": "dbhistory-ecommerce",
+
+    "transforms": "unwrap,bit2boolean",
+    
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "true",
+    "transforms.unwrap.delete.handling.mode": "rewrite",
+
+    "transforms.bit2boolean.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.bit2boolean.spec": "is_active:boolean,is_paid:boolean",
+
+
+    "time.precision.mode": "connect",
+    "connect.timezone": "UTC"
   }
 }

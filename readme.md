@@ -560,3 +560,179 @@ curl -s http://localhost:8083/connectors/pg-sink-ecommerce/status | jq .
   - etc.
 
 **Perfect setup!** 🎉 You'll have all your Kafka data flowing into PostgreSQL with proper schema separation!
+
+validate before posting 
+curl -X PUT -H "Content-Type: application/json" \
+  --data @pg-sink-customers.json \
+  http://localhost:8083/connector-plugins/io.confluent.connect.jdbc.JdbcSinkConnector/config/validate
+Great question 💯 — it’s really important to verify that the connector is actually running with the config you think it has. Here’s how you can be sure:
+
+---
+
+### 1. **Check the running connector config**
+
+Run:
+
+```bash
+curl -s http://localhost:8083/connectors/pg-sink-customers/config | jq
+```
+
+This will return the **effective config** that Kafka Connect is using.
+
+* Verify `pk.mode=record_key`
+* Verify `delete.enabled=true`
+* Verify `transforms.unwrap.drop.tombstones=false`
+
+---
+
+### 2. **Check connector status**
+
+```bash
+curl -s http://localhost:8083/connectors/pg-sink-customers/status | jq
+```
+
+* Look for `"state": "RUNNING"` on the tasks.
+* If you see `"FAILED"`, check the logs.
+
+---
+
+### 3. **Check Kafka Connect logs**
+
+Inside your Kafka Connect container:
+
+```bash
+docker logs -f kafka-connect
+```
+
+Search for `pg-sink-customers`. You’ll see the config being applied at startup.
+
+---
+
+### 4. **Test end-to-end**
+
+The ultimate test is to perform a delete in MySQL and see it reflected in Postgres:
+
+1. In MySQL:
+
+   ```sql
+   DELETE FROM customers WHERE customer_id = 1;
+   ```
+2. Watch Kafka topic to confirm Debezium emitted a delete:
+
+   ```bash
+   docker exec -it sql-kafka-1 kafka-console-consumer \
+     --bootstrap-server localhost:9092 \
+     --topic transactions.ecommerce.customers \
+     --from-beginning \
+     --max-messages 5 \
+     --property print.key=true --property print.value=true
+   ```
+
+   You should see a record with `key={"customer_id":1}` and `value=null`.
+3. In Postgres:
+
+   ```bash
+   docker exec -it sql-postgres-1 psql -U pgwriter -d transactions -c "SELECT * FROM customers WHERE customer_id=1;"
+   ```
+
+   → Should return **0 rows**.
+
+---
+
+⚡ That’s the safest way:
+
+* Step 1 ensures config is correct.
+* Step 2 ensures connector is healthy.
+* Step 3/4 ensures deletes flow end-to-end.
+
+Do you want me to also give you a **one-liner query** that checks if any rows are left in Postgres which *should* have been deleted (to quickly spot sync issues)?
+Good catch 👍 — yes, Debezium will **auto-create** the history topic the first time you register the source connector **if**:
+
+* The Kafka broker allows auto topic creation (`auto.create.topics.enable=true`, which is the default in most setups).
+* You don’t manually pre-create it.
+
+But:
+
+* The connector **won’t set cleanup.policy=compact** by itself. It’ll just make a plain topic with `delete` policy.
+* For schema history, compaction is critical — otherwise old schema records get deleted and recovery breaks.
+
+👉 That’s why the Debezium docs always recommend **pre-creating the history topic with compaction enabled** before starting the connector.
+
+So to answer directly:
+
+* If you register the connector without creating the topic, it will get created automatically.
+* If you want the correct retention/compaction settings, you should create it yourself first.
+
+Do you want me to make you a small script that **checks if `dbhistory-ecommerce` exists**, and only creates it with compaction if it doesn’t?
+curl -X DELETE http://localhost:8083/connectors/pg-sink-customers
+Found the issue! Your UFW firewall is only allowing connections from `172.19.0.0/16`, but your Docker network is using `172.18.0.0/16`. Let's fix this:
+
+## 1. Allow your Docker network in UFW:
+
+```bash
+# Allow connections from your actual Docker network
+sudo ufw allow from 172.18.0.0/16 to any port 3306
+
+# Check the updated rules
+sudo ufw status
+```
+
+## 2. Test the connection again:
+
+```bash
+# Test from a container in your Docker network
+docker run --rm --network sql_cdc-network alpine nc -zv 192.168.100.3 3306
+
+# Or test with the gateway IP
+docker run --rm --network sql_cdc-network alpine nc -zv 172.18.0.1 3306
+```
+
+## 3. Alternative: Allow all Docker networks:
+
+```bash
+# Allow common Docker network ranges
+sudo ufw allow from 172.17.0.0/16 to any port 3306
+sudo ufw allow from 172.18.0.0/16 to any port 3306
+sudo ufw allow from 172.19.0.0/16 to any port 3306
+
+# Or allow from any IP (less secure, but for development)
+sudo ufw allow 3306
+```
+
+## 4. Verify the fix:
+
+```bash
+# Check UFW rules
+sudo ufw status numbered
+
+# Test connectivity
+docker run --rm --network sql_cdc-network alpine nc -zv 192.168.100.3 3306
+
+# If that works, test MySQL connection
+docker run --rm --network sql_cdc-network --add-host host.docker.internal:host-gateway alpine sh -c "apk add mysql-client && mysql -h host.docker.internal -u debezium -p'@lgor1st' -e 'SHOW DATABASES;'"
+```
+
+## 5. Update your docker-compose with extra_hosts:
+
+Once the connectivity is working, add this to your `docker-compose.yml`:
+
+```yaml
+debezium-connect:
+  # ... existing config
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  # ... rest of config
+
+confluent-connect:
+  # ... existing config  
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  # ... rest of config
+```
+
+Then restart the services:
+```bash
+docker compose up -d --force-recreate debezium-connect confluent-connect
+```
+
+The firewall rule was blocking your Docker containers because they're on a different subnet (`172.18.0.0/16`) than what was allowed (`172.19.0.0/16`). Run the UFW allow command and test again!

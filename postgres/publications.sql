@@ -33,7 +33,8 @@ CREATE PUBLICATION ecommerce_pub FOR TABLE
     ecommerce.orders,
     ecommerce.order_items,
     ecommerce.payments,
-    ecommerce.shipments;
+    ecommerce.shipments,
+    ecommerce.reviews;
 
 -- Verify publications
 SELECT 

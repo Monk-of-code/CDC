@@ -1,0 +1,86 @@
+startDelaySeconds: 0
+hostPort: localhost:9010
+username: ""
+password: ""
+jmxUrl: ""
+ssl: false
+lowercaseOutputName: true
+lowercaseOutputLabelNames: true
+
+# Rules tell JMX Exporter how to map JMX beans to Prometheus metrics
+rules:
+  # JVM Metrics
+  - pattern: 'java.lang:type=Memory'
+    name: jvm_memory_bytes
+    type: GAUGE
+    labels:
+      area: "$1"
+      id: "$2"
+    attrNameSnakeCase: true
+
+  - pattern: 'java.lang:type=GarbageCollector,name=(.*)'
+    name: jvm_gc_collections_total
+    type: COUNTER
+    labels:
+      collector: "$1"
+    attrNameSnakeCase: true
+
+  # Thread metrics
+  - pattern: 'java.lang:type=Threading'
+    name: jvm_threads
+    type: GAUGE
+    attrNameSnakeCase: true
+
+  # Debezium/Kafka Connect task metrics
+  - pattern: 'kafka.connect<type=connector-task-metrics, connector=(.*), task=(.*)><>status'
+    name: connect_task_status
+    labels:
+      connector: "$1"
+      task: "$2"
+    type: GAUGE
+
+  - pattern: 'kafka.connect<type=connector-metrics, connector=(.*)><>status'
+    name: connect_connector_status
+    labels:
+      connector: "$1"
+    type: GAUGE
+
+  # Task error metrics
+  - pattern: 'kafka.connect<type=task-error-metrics, connector=(.*), task=(.*)><>total-record-errors'
+    name: connect_task_record_errors_total
+    labels:
+      connector: "$1"
+      task: "$2"
+    type: COUNTER
+
+  - pattern: 'kafka.connect<type=task-error-metrics, connector=(.*), task=(.*)><>total-record-failures'
+    name: connect_task_record_failures_total
+    labels:
+      connector: "$1"
+      task: "$2"
+    type: COUNTER
+
+  # Source metrics (Debezium specific)
+  - pattern: 'debezium.connector<type=source-metrics, connector=(.*)><>TotalNumberOfEventsSeen'
+    name: debezium_events_seen_total
+    labels:
+      connector: "$1"
+    type: COUNTER
+
+  - pattern: 'debezium.connector<type=source-metrics, connector=(.*)><>TotalNumberOfErrors'
+    name: debezium_events_errors_total
+    labels:
+      connector: "$1"
+    type: COUNTER
+
+  - pattern: 'debezium.connector<type=source-metrics, connector=(.*)><>NumberOfCommittedTransactions'
+    name: debezium_committed_transactions_total
+    labels:
+      connector: "$1"
+    type: COUNTER
+
+  - pattern: 'debezium.connector<type=source-metrics, connector=(.*)><>NumberOfRolledBackTransactions'
+    name: debezium_rolledback_transactions_total
+    labels:
+      connector: "$1"
+    type: COUNTER

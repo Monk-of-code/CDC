@@ -1,18 +1,35 @@
 {
-  "name": "jdbc-sink-hr",
+  "name": "pg-sink-hr",
   "config": {
     "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
     "tasks.max": "1",
-    "topics": "hr.employees,hr.departments,hr.salaries,hr.attendance,hr.projects,hr.employee_projects",
-    "connection.url": "jdbc:postgresql://localhost:5432/transactions",
+    
+    
+    "topics": "mysql-server-hr.transactions.hr.departments,mysql-server-hr.transactions.hr.employees,mysql-server-hr.transactions.hr.attendance,mysql-server-hr.transactions.hr.salaries,mysql-server-hr.transactions.hr.projects,mysql-server-hr.transactions.hr.employee_projects",
+    
+    "connection.url": "jdbc:postgresql://localhost:5433/transactions",
     "connection.user": "pgwriter",
     "connection.password": "PG_PASS",
     "auto.create": "false",
     "auto.evolve": "false",
     "insert.mode": "upsert",
     "pk.mode": "record_key",
-    "pk.fields": "id",
-    "transforms": "unwrap",
-    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState"
+    "delete.enabled": "true",
+
+    "transforms": "unwrap,route,castTypes",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "mysql-server-hr\\.transactions\\.hr\\.(.*)",
+    "transforms.route.replacement": "$1",
+    
+    "transforms.castTypes.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.castTypes.spec": "department_id:int32,employee_id:int32,attendance_id:int32,salary_id:int32,project_id:int32,employee_project_id:int32,salary:float64,budget:float64",
+    
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false"
   }
 }

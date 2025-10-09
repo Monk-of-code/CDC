@@ -1,0 +1,24 @@
+{
+  "name": "pg-sink-salaries",
+  "config": {
+    "connector.class": "io.confluent.connect.jdbc.JdbcSinkConnector",
+    "tasks.max": "1",
+    "topics": "transactions.hr.salaries",
+    "connection.url": "jdbc:postgresql://postgres:5432/transactions",
+    "connection.user": "pgwriter",
+    "connection.password": "PG_PASS",
+    "auto.create": "false",
+    "auto.evolve": "false",
+    "insert.mode": "upsert",
+    "pk.mode": "record_key",
+    "delete.enabled": "true",
+    "transforms": "unwrap,route,cast",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.route.type": "org.apache.kafka.connect.transforms.RegexRouter",
+    "transforms.route.regex": "transactions\\.hr\\.(.*)",
+    "transforms.route.replacement": "hr.$1",
+    "transforms.cast.type": "org.apache.kafka.connect.transforms.Cast$Value",
+    "transforms.cast.spec": "salary_id:int32,employee_id:int32,salary:decimal"
+  }
+}

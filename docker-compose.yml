@@ -1,17 +1,17 @@
-version: '3.8'
 services:
-  # Zookeeper
+  # ------------------------
+  # Kafka Core
+  # ------------------------
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
-      - ZOOKEEPER_CLIENT_PORT=2181
-      - ZOOKEEPER_TICK_TIME=2000
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
     networks:
       - cdc-network
 
-  # Kafka
   kafka:
     image: confluentinc/cp-kafka:7.5.0
     depends_on:
@@ -20,67 +20,98 @@ services:
       - "9092:9092"
       - "29092:29092"
     environment:
-      - KAFKA_BROKER_ID=1
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      - KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
-      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    healthcheck:
+      test: ["CMD", "kafka-topics", "--bootstrap-server", "kafka:9092", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 40s
     networks:
       - cdc-network
 
-  # Unified Kafka Connect (Debezium + JDBC)
-  kafka-connect:
-    image: confluentinc/cp-kafka-connect:7.5.0
+  # ------------------------
+  # Debezium Connect Cluster (Source + Sink)
+  # ------------------------
+  debezium-connect:
+    build:
+      context: .
+      dockerfile: Dockerfile.debezium
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "8083:8083"
+      - "9404:9404"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      - CONNECT_BOOTSTRAP_SERVERS=kafka:9092
-      - CONNECT_GROUP_ID=connect-cluster
-      - CONNECT_CONFIG_STORAGE_TOPIC=connect_configs
-      - CONNECT_OFFSET_STORAGE_TOPIC=connect_offsets
-      - CONNECT_STATUS_STORAGE_TOPIC=connect_statuses
-      - CONNECT_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
-      - CONNECT_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
-      - CONNECT_INTERNAL_KEY_CONVERTER=org.apache.kafka.connect.json.JsonConverter
-      - CONNECT_INTERNAL_VALUE_CONVERTER=org.apache.kafka.connect.json.JsonConverter
-      - CONNECT_REST_ADVERTISED_HOST_NAME=kafka-connect
-      - CONNECT_PLUGIN_PATH=/usr/share/confluent-hub-components
-      - CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR=1
-      - CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR=1
-      - CONNECT_STATUS_STORAGE_REPLICATION_FACTOR=1
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: debezium-cluster
+      CONFIG_STORAGE_TOPIC: debezium_configs
+      OFFSET_STORAGE_TOPIC: debezium_offsets
+      STATUS_STORAGE_TOPIC: debezium_statuses
+
+      KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      KEY_CONVERTER_SCHEMAS_ENABLE: "true"
+      VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      VALUE_CONVERTER_SCHEMAS_ENABLE: "true"
+
+      INTERNAL_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      INTERNAL_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
+
+      PLUGIN_PATH: /kafka/connect
+
     command:
       - bash
       - -c
       - |
-        echo "Installing connectors..."
-        confluent-hub install --no-prompt debezium/debezium-connector-mysql:2.1.4
-        confluent-hub install --no-prompt debezium/debezium-connector-postgresql:2.1.4
-        confluent-hub install --no-prompt confluentinc/kafka-connect-jdbc:10.7.4
-        echo "Launching Kafka Connect worker"
-        /etc/confluent/docker/run
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+        echo "Waiting for Kafka to be ready..."
+        sleep 30
+        echo "Starting Debezium Connect..."
+        /docker-entrypoint.sh start
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8083/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
     networks:
       - cdc-network
 
+  # ------------------------
+
   # Kafka UI
+  # ------------------------
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     depends_on:
-      - kafka
+      kafka:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
-      - KAFKA_CLUSTERS_0_NAME=local
-      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=kafka:9092
-      - KAFKA_CLUSTERS_0_ZOOKEEPER=zookeeper:2181
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium-connect:8083
     networks:
       - cdc-network
 
-  # Prometheus
+  # ------------------------
+  # Monitoring
+  # ------------------------
   prometheus:
     image: prom/prometheus:v2.40.0
     ports:
@@ -94,27 +125,14 @@ services:
     networks:
       - cdc-network
 
-  # Kafka Exporter
-  kafka-exporter:
-    image: danielqsj/kafka-exporter:latest
-    command:
-      - --kafka.server=kafka:9092
-    ports:
-      - "9308:9308"
-    depends_on:
-      - kafka
-    networks:
-      - cdc-network
-
-  # Grafana
   grafana:
     image: grafana/grafana:9.2.0
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning
@@ -124,13 +142,60 @@ services:
     networks:
       - cdc-network
 
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:latest
+    command:
+      - --kafka.server=kafka:9092
+      - --topic.filter=.*
+      - --group.filter=.*
+    ports:
+      - "9308:9308"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - cdc-network
+
+  # ------------------------
+  # Database Exporters
+  # ------------------------
+  mysql-exporter:
+    image: prom/mysqld-exporter:v0.15.0
+    ports:
+      - "9104:9104"
+    volumes:
+      - ./my.cnf:/etc/my.cnf:ro
+    environment:
+      DATA_SOURCE_NAME: "metrics:metrics_password@tcp(172.17.0.1:3306)/"
+    command:
+      - "--config.my-cnf=/etc/my.cnf"
+      - "--collect.info_schema.tables"
+      - "--collect.info_schema.tablestats"
+      - "--collect.perf_schema.tableiowaits"
+      - "--collect.perf_schema.indexiowaits"
+      - "--collect.auto_increment.columns"
+      - "--collect.binlog_size"
+      - "--collect.global_status"
+      - "--collect.global_variables"
+      - "--collect.engine_innodb_status"
+      - "--collect.perf_schema.eventsstatements"
+    networks:
+      - cdc-network
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.13.2
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://metrics:metrics_password@172.17.0.1:5433/transactions?sslmode=disable"
+    networks:
+      - cdc-network
+
 networks:
   cdc-network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 172.19.0.0/16
 
 volumes:
   prometheus-data:
   grafana-data:
+
